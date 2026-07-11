@@ -45,7 +45,7 @@ export function OniRainfallScatter({ regionId }: { regionId: string }) {
     ApiCorrelationScatter,
     ScatterPoint[]
   >({
-    apiFn: () => fetchCorrelationScatter(regionId),
+    apiFn: () => fetchCorrelationScatter(name),
     transform: (api) =>
       api.points.map((p) => ({
         year: p.year,

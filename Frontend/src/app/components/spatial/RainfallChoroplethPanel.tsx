@@ -20,9 +20,10 @@ export function RainfallChoroplethPanel({ year, height = 360 }: { year: number; 
     transform: (api) => {
       const out: Record<string, number> = {};
       api.states.forEach((s) => {
+        const normalizedName = s.state.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").toLowerCase();
         const id = Object.entries(STATE_NAME_BY_ID).find(
-          ([, name]) => name.toLowerCase() === s.state.toLowerCase()
-        )?.[0] ?? s.state.toLowerCase().replace(/\s+/g, "_");
+          ([, name]) => name.toLowerCase() === normalizedName
+        )?.[0] ?? normalizedName.replace(/\s+/g, "_");
         out[id] = s.deviation_pct;
       });
       return out;

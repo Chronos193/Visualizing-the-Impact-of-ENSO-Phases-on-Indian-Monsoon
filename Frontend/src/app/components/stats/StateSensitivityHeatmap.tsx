@@ -1,6 +1,7 @@
 import { fetchCorrelationHeatmap, type ApiCorrelationHeatmap } from "../../data/api";
 import { useApiData } from "../../data/useApiData";
 import { correlationScale } from "../../lib/colorScale";
+import { getIdByStateName } from "../../data/constants";
 import { GridHeatmap } from "../heatmap/GridHeatmap";
 import { LoadingState, ErrorState } from "../ui/ErrorState";
 
@@ -23,7 +24,7 @@ export function StateSensitivityHeatmap({ selectedRegionId, onSelect }: StateSen
     transform: (api) =>
       api.pearson_r.map((entry) => ({
         name: entry.state,
-        regionId: entry.state.toLowerCase().replace(/\s+/g, "_"),
+        regionId: getIdByStateName(entry.state),
         r: entry.r,
         n: 0, // not available from API
       })),

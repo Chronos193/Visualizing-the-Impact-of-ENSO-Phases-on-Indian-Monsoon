@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { useFilters } from "../../context/FilterContext";
 import { useData } from "../../context/DataProvider";
-import { STATE_NAME_BY_ID } from "../../data/constants";
+import { STATE_NAME_BY_ID, getIdByStateName } from "../../data/constants";
 import { fetchRainfallAnomaly, fetchRainfallCumulative, type ApiRainfallAnomaly, type ApiRainfallCumulative } from "../../data/api";
 import { useApiData } from "../../data/useApiData";
 import { rainfallScale } from "../../lib/colorScale";
@@ -40,10 +40,7 @@ export function OverviewModule() {
     transform: (api) => {
       const out: Record<string, number> = {};
       api.states.forEach((s) => {
-        const id = Object.entries(STATE_NAME_BY_ID).find(
-          ([, name]) => name.toLowerCase() === s.state.toLowerCase()
-        )?.[0] ?? s.state.toLowerCase().replace(/\s+/g, "_");
-        out[id] = s.deviation_pct;
+        out[getIdByStateName(s.state)] = s.deviation_pct;
       });
       return out;
     },

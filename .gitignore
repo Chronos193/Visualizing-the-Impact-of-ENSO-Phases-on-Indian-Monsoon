@@ -1,34 +1,12 @@
-# Environments
-.env
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
 .venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Frontend
-Frontend/node_modules/
-Frontend/dist/
-Frontend/.eslintcache
-Frontend/dist-ssr/
-
-# Backend
-backend/__pycache__/
-backend/*.py[cod]
-backend/*$py.class
-backend/.pytest_cache/
-backend/.mypy_cache/
-backend/.ruff_cache/
-backend/alembic.ini
-
-# Data
-/data
-
-# IDEs and OS
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+.pytest_cache
+data

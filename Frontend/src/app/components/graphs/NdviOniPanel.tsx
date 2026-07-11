@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Area,
+  Brush,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -37,8 +38,11 @@ export function NdviOniPanel({ className }: { className?: string }) {
   const { compareMode, year, compareYear } = state;
   const [groupId, setGroupId] = useState("C");
 
-  const regionLabel =
+  let regionLabel =
     REGION_GROUPS.find((g) => g.id === groupId)?.label?.toLowerCase() ?? "central";
+  if (regionLabel === "east & ne") {
+    regionLabel = "east";
+  }
 
   const { data, loading, error, refetch } = useApiData<
     ApiNdviRegional,
@@ -141,6 +145,14 @@ export function NdviOniPanel({ className }: { className?: string }) {
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
+              />
+              <Brush 
+                dataKey="date" 
+                height={24} 
+                stroke="var(--muted-foreground)" 
+                fill="var(--background)"
+                tickFormatter={(v: string) => v.slice(0, 4)} 
+                startIndex={data.length > 40 ? data.length - 40 : 0}
               />
             </ComposedChart>
           </ResponsiveContainer>

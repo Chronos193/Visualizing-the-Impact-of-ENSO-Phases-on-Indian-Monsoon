@@ -27,9 +27,10 @@ function AnomalyMap({ year, prefix }: { year: number; prefix: string }) {
       const d: Record<string, AnomalyDetail> = {};
       api.states.forEach((s) => {
         // Match by state name to region ID
+        const normalizedName = s.state.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").toLowerCase();
         const id = Object.entries(STATE_NAME_BY_ID).find(
-          ([, name]) => name.toLowerCase() === s.state.toLowerCase()
-        )?.[0] ?? s.state.toLowerCase().replace(/\s+/g, "_");
+          ([, name]) => name.toLowerCase() === normalizedName
+        )?.[0] ?? normalizedName.replace(/\s+/g, "_");
         d[id] = { pct: s.deviation_pct, actualMm: s.actual_mm, lpaMm: s.lpa_mm };
       });
       return d;

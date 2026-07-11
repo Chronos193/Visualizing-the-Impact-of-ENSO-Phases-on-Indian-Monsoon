@@ -1,8 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import sst, oni, rainfall, correlation, ndvi
+import datetime
 
 app = FastAPI(title="ENSO-Monsoon Analytics API")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    with open("request_logs.txt", "a") as f:
+        f.write(f"{datetime.datetime.now()} Request: {request.method} {request.url}\n")
+    response = await call_next(request)
+    with open("request_logs.txt", "a") as f:
+        f.write(f"{datetime.datetime.now()} Response: {response.status_code} for {request.url}\n")
+    return response
 
 app.add_middleware(
     CORSMiddleware,

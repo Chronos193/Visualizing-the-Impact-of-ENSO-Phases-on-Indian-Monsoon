@@ -1,17 +1,21 @@
 import { useMemo } from "react";
 import { useFilters } from "../../context/FilterContext";
-import { fetchRainfallAnimationFrame } from "../../data/api";
+import { fetchRainfallAnimation, type ApiAnimation } from "../../data/api";
 import { useApiData } from "../../data/useApiData";
-import { STATE_NAME_BY_ID, MONSOON_ANIM_DAYS } from "../../data/constants";
+import { STATE_NAME_BY_ID } from "../../data/constants";
 import { IndiaChoropleth, type PatternDensity } from "../maps/IndiaChoropleth";
 import { LoadingState, ErrorState } from "../ui/ErrorState";
 
 function cumColor(v: number, max: number): string {
-  const t = Math.max(0, Math.min(1, v / (max || 1)));
+  // Cap at 1500mm so extreme states like Meghalaya don't wash out the rest of the country
+  const cappedMax = Math.min(max, 1500);
+  const t = Math.max(0, Math.min(1, v / (cappedMax || 1)));
   const stops: [number, [number, number, number]][] = [
-    [0, [254, 240, 176]],
-    [0.5, [45, 178, 168]],
-    [1, [30, 64, 175]],
+    [0, [248, 250, 252]],   // slate-50 (dry/almost white)
+    [0.2, [186, 230, 253]], // sky-200 (light blue)
+    [0.5, [56, 189, 248]],  // sky-400 (blue)
+    [0.8, [2, 132, 199]],   // sky-600 (dark blue)
+    [1, [15, 23, 42]],      // slate-900 (navy)
   ];
   for (let i = 0; i < stops.length - 1; i++) {
     const [t0, c0] = stops[i];
@@ -24,7 +28,7 @@ function cumColor(v: number, max: number): string {
       return `rgb(${r}, ${g}, ${b})`;
     }
   }
-  return "rgb(30, 64, 175)";
+  return "rgb(15, 23, 42)";
 }
 
 function currentDensity(current: number): PatternDensity {
@@ -33,20 +37,6 @@ function currentDensity(current: number): PatternDensity {
   if (current < 120) return "medium";
   return "heavy";
 }
-
-/** Compute the animation date window for a given playback day. */
-function getDateWindow(year: number, day: number): { start: string; end: string; periodStart: string } {
-  const jun1 = new Date(year, 5, 1);
-  const endDate = new Date(jun1);
-  endDate.setDate(endDate.getDate() + day);
-  const periodStart = new Date(endDate);
-  periodStart.setDate(periodStart.getDate() - 6); // 7-day window
-  if (periodStart < jun1) periodStart.setTime(jun1.getTime());
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return { start: fmt(periodStart), end: fmt(endDate), periodStart: fmt(jun1) };
-}
-
-interface FrameCell { state: string; current_rain: number; cumulative_rain: number }
 
 interface RainfallAnimatedMapProps {
   year: number;
@@ -64,28 +54,49 @@ export function RainfallAnimatedMap({
   const { state, selectRegion, hoverRegion } = useFilters();
   const day = state.playbackDay;
 
-  const dates = useMemo(() => getDateWindow(year, day), [year, day]);
+  // Map day (0-153) to week number (22-43)
+  const targetWeek = Math.floor(day / 7) + 22;
 
-  const { data: frame, loading, error } = useApiData<
-    { frame: FrameCell[] },
-    Record<string, { cumMm: number; currentMm: number }>
+  const { data: animation, loading, error } = useApiData<
+    ApiAnimation,
+    ApiAnimation
   >({
-    apiFn: () => fetchRainfallAnimationFrame(year, dates.start, dates.end),
-    transform: (api) => {
-      const out: Record<string, { cumMm: number; currentMm: number }> = {};
-      api.frame.forEach((f) => {
-        const id = f.state.toLowerCase().replace(/\s+/g, "_");
-        out[id] = { cumMm: Math.round(f.cumulative_rain ?? 0), currentMm: Math.round(f.current_rain ?? 0) };
-      });
-      return out;
-    },
-    deps: [year, day],
+    apiFn: () => fetchRainfallAnimation(year),
+    transform: (api) => api,
+    deps: [year],
   });
 
   if (loading) return <LoadingState className="h-full" />;
-  if (error || !frame) return <ErrorState message={error ?? "No animation data."} />;
+  if (error || !animation) return <ErrorState message={error ?? "No animation data."} />;
 
-  const maxCum = Math.max(1, ...Object.values(frame).map((c) => c.cumMm));
+  const stateIdByName = Object.fromEntries(Object.entries(STATE_NAME_BY_ID).map(([id, name]) => [name, id]));
+  
+  // Extract frame for targetWeek
+  const frame: Record<string, { cumMm: number; currentMm: number }> = {};
+  
+  // Find the global maximum cumulative rain across ALL weeks for a stable color scale
+  let maxCum = 1;
+  
+  Object.entries(animation).forEach(([stateName, weeks]) => {
+    // Some names from geojson have diacritics (e.g. "Bihār"). Strip them so they match constants.ts
+    const normalizedName = stateName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and");
+    const id = stateIdByName[normalizedName];
+    if (!id) return;
+    
+    // Find global max
+    const stateMax = Math.max(...weeks.map(w => w.cumMm));
+    if (stateMax > maxCum) maxCum = stateMax;
+    
+    // Find the specific week
+    // If the exact week doesn't exist, we fall back to the closest previous week or zero.
+    const currentWeekData = weeks.find(w => w.week === targetWeek) || weeks.find(w => w.week < targetWeek);
+    
+    if (currentWeekData) {
+      frame[id] = { cumMm: currentWeekData.cumMm, currentMm: currentWeekData.currentMm };
+    } else {
+      frame[id] = { cumMm: 0, currentMm: 0 };
+    }
+  });
 
   const colorById: Record<string, string> = {};
   const patternById: Record<string, PatternDensity> = {};

@@ -20,9 +20,17 @@ REGION_MAPPING = {
     "Central": ["Madhya Pradesh", "Chhattisgarh"]
 }
 
+import unicodedata
+
+def normalize_state(name):
+    n = unicodedata.normalize('NFD', name)
+    n = ''.join(c for c in n if unicodedata.category(c) != 'Mn')
+    return n.replace('&', 'and')
+
 def get_region(state_name):
+    norm_name = normalize_state(state_name).lower()
     for region, states in REGION_MAPPING.items():
-        if any(s.lower() in state_name.lower() for s in states):
+        if any(s.lower() in norm_name for s in states):
             return region
     return "Other"
 

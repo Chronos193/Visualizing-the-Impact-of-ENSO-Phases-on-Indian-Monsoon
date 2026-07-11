@@ -52,7 +52,7 @@ def run():
     # Read rainfall anomalies
     anomaly_dir = PRECOMPUTED_DIR / "rainfall" / "anomaly"
     state_years = {}
-    for y in range(2009, 2025):
+    for y in range(2000, 2025):
         fp = anomaly_dir / f"{y}.json"
         if not fp.exists():
             continue

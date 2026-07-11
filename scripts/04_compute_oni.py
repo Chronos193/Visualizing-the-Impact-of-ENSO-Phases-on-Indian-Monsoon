@@ -16,23 +16,15 @@ def run():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Timeseries (restrict to 2000-01 … 2024-12 to match dashboard range)
-    rows = cursor.execute(
-        "SELECT year_month, oni, phase FROM oni_monthly "
-        "WHERE year_month >= '2000-01' AND year_month <= '2024-12' "
-        "ORDER BY year_month"
-    ).fetchall()
+    # Timeseries
+    rows = cursor.execute("SELECT year_month, oni, phase FROM oni_monthly ORDER BY year_month").fetchall()
     timeseries_data = [{"year_month": r[0], "oni": round(r[1], 2), "phase": r[2]} for r in rows if r[1] is not None]
     
     with open(oni_dir / "oni_timeseries.json", "w") as f:
         json.dump({"data": timeseries_data}, f)
         
-    # Phase Summary (same range)
-    rows = cursor.execute(
-        "SELECT phase, COUNT(*) as count FROM oni_monthly "
-        "WHERE year_month >= '2000-01' AND year_month <= '2024-12' "
-        "GROUP BY phase"
-    ).fetchall()
+    # Phase Summary
+    rows = cursor.execute("SELECT phase, COUNT(*) as count FROM oni_monthly GROUP BY phase").fetchall()
     phase_data = [{"phase": r[0], "count": r[1]} for r in rows]
     
     with open(oni_dir / "phase_summary.json", "w") as f:

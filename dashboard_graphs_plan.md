@@ -1,325 +1,311 @@
-# Dashboard Implementation — ENSO × Indian Monsoon (v3)
+# Dashboard Graphs Plan — ENSO × Indian Monsoon (v3)
 
-> **This document describes the _implemented_ dashboard as of July 2026.**
-> For the original design proposal see `Project_Proposal.pdf`.
-
----
-
-## Architecture Overview
-
-| Layer | Technology | Location |
-|-------|-----------|----------|
-| **Frontend** | React 18 + Vite + Recharts + Tailwind 4 + shadcn/ui | `Frontend/` |
-| **Backend** | FastAPI + SQLite + pre-computed JSON | `backend/` |
-| **Data Pipeline** | Python scripts (xarray, pandas, scipy, rasterio) | `backend/scripts/` |
-| **Data Store** | SQLite DB + pre-computed JSON + raw NetCDF/GeoTIFF | `data/` |
-
-The frontend is a **self-contained SPA** that bundles real observational data (NOAA ONI 1950–present, IMD rainfall 1901–2015) and uses deterministic seeded generators for modeled data (SST grids, NDVI, monsoon onset). It connects to the FastAPI backend via a Vite dev proxy (`/api/*` → `http://127.0.0.1:8000`) and gracefully falls back to client-side generators when the backend is unreachable.
+Full proposal coverage: animated monsoon map, comparison toggle, landscape layout, OISST comparison, ONI detail panels, correlation heatmap.
 
 ---
 
-## Dataset Sources
+## Your Datasets → Proposal Mapping
 
-| # | Dataset | Source | Format | Resolution | Time Range |
-|---|---------|--------|--------|-----------|------------|
-| D1 | **ERSST v6** | NOAA | NetCDF (per-month `.nc`) | 2° × 2° grid, monthly | 2024-02 – 2025-09 (318 files) |
-| D2 | **OISST v2.1** | NOAA | NetCDF (`.nc`) | 0.25° × 0.25° grid, daily | Subset (1 file) |
-| D3 | **CHIRPS Rainfall** | CHG / UCSB | GeoTIFF (`.tif`) | 5 km, monthly | India extent |
-| D4 | **MODIS NDVI** | NASA Terra | GeoTIFF (`.tif`) | 48-day composite, 1 km | 2000–2024 (1 file) |
-| D5 | **India States** | — | GeoJSON | State boundaries | — |
+| Dataset | What It Covers | Used In Graphs |
+|---------|---------------|----------------|
+| **State daily rainfall (2009–2024)** | IMD-style state-level daily rain | Graphs 3, 4, 5 |
+| **MODIS NDVI (2 km × 2.5 km, 48-day, 2000–2024)** | Vegetation health proxy | Graph 6 |
+| **ERSST monthly Pacific SST** | Sea Surface Temperature (2° grid) → ONI | Graphs 1, 2, 5, 6 |
+| **OISST daily Pacific SST** *(to download)* | High-res SST (0.25° grid) for comparison | Graph 1 |
 
-### Frontend-Bundled Data
+---
 
-| File | Contents |
+## The 6 Graphs
+
+### Graph 1 — SST Dataset Comparison: ERSST vs OISST *(Proposal §4.1)*
+
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Side-by-side synchronized heatmaps** |
+| **Size** | 🟡 **Small** (supporting context, 25% width) |
+| **Data** | ERSST (2° grid) + OISST (0.25° grid), both cropped to Niño 3.4 box (5°N–5°S, 170°W–120°W) |
+| **What to plot** | Two heatmaps stacked vertically — ERSST (top, coarse grid) vs OISST (bottom, fine grid). Both use the same **diverging RdBu colorscale** and shared color range. |
+| **Interactivity** | Event dropdown: Nov 2015 / Nov 2020 / Nov 2023. Hover tooltip shows exact SST (°C). Synced zoom — pan one map, the other follows. |
+
+> [!NOTE]
+> Stacking vertically (not side-by-side) fits the 25%-width column. The visual contrast between ERSST's ~10 grid cells vs OISST's ~640 cells in the same region immediately demonstrates why ERSST is preferred for stable ONI calculation (filters out noise from eddies/upwellings).
+
+---
+
+### Graph 2 — ONI Timeline + Detail-on-Demand Panel *(Proposal §4.2)*
+
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Diverging area chart** (positive = red/El Niño, negative = blue/La Niña) |
+| **Size** | 🟠 **Full width** strip (~15% height) — acts as the global time-context anchor |
+| **Data** | Derive ONI from ERSST: monthly SST anomaly in Niño 3.4 → 3-month running mean |
+| **What to plot** | ONI over full time range; shade ≥ +0.5 red, ≤ −0.5 blue, between = grey |
+| **Interactivity** | Brush selector to zoom into time window; hover tooltips with ONI value and phase label |
+
+> [!IMPORTANT]
+> This is the **anchor chart**. The brushed time window filters/highlights Graphs 3–6 **and** triggers the detail panel below.
+
+#### 📋 Slide-Out Detail Panel (triggered by brush selection)
+
+When the user brushes a time window on the ONI chart, a **slide-out panel** appears from the right edge of the dashboard (overlays ~30% width) containing 3 sub-charts:
+
+| Sub-chart | Type | What it shows |
+|-----------|------|---------------|
+| **Phase Distribution Donut** | Donut / pie chart | % of months classified as El Niño / La Niña / Neutral within the brushed window |
+| **Seasonal Intensity Heatmap** | Heatmap (month × year) | ONI value colored by intensity for each month-year cell in the selected range. Reveals seasonal patterns (e.g., El Niño peaks in DJF). |
+| **ONI Derivation Proof** | Multi-line chart | 4 overlaid lines: (1) Raw SST in Niño 3.4, (2) 30-year base climatology, (3) Monthly anomaly = (1)−(2), (4) 3-month running mean = final ONI. Shows the user *exactly* how ONI is computed. |
+
+> [!TIP]
+> The panel slides in/out with a close button (✕). It **overlays** the dashboard rather than rearranging it, so the layout stays stable.
+
+---
+
+### ⭐ Graph 3 — Animated Monsoon Onset Choropleth *(Proposal §4.3)* — **HERO GRAPH**
+
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Animated choropleth map of India** with play/pause controls |
+| **Size** | 🔴 **Large** (hero visualization — tallest & widest, central position) |
+| **Data** | State daily rainfall → aggregate to bi-weekly or weekly windows for each monsoon season (Jun–Oct) |
+
+#### Encoding Scheme
+
+```
+┌──────────────────────────────────────────────────┐
+│  Each state on the India map has TWO layers:     │
+│                                                  │
+│  1. FILL COLOR  → Cumulative rainfall (Jan 1     │
+│     to current frame date). Sequential colorscale│
+│     light yellow → deep blue.                    │
+│     Shows: "How much rain has fallen so far?"    │
+│                                                  │
+│  2. HATCHING / SHADING OVERLAY → Current-period  │
+│     rainfall (this week/fortnight only).          │
+│     Density of diagonal lines or dot-pattern     │
+│     encodes current rain intensity.              │
+│     Light dots = light rain now                  │
+│     Dense hatching = heavy rain now              │
+│     No shading = dry spell this period           │
+│     Shows: "Is it raining RIGHT NOW?"            │
+└──────────────────────────────────────────────────┘
+```
+
+| Visual Channel | Encodes | Scale |
+|----------------|---------|-------|
+| **Fill color** (sequential) | Cumulative rainfall to date (mm) | Light yellow → Teal → Deep blue |
+| **Hatching/shading density** | Current-period rainfall (mm) | None → Light dots → Dense lines |
+
+#### Animation & Controls
+
+- **▶ Play / ⏸ Pause / ⏪ Rewind** buttons to animate through the monsoon season frame by frame
+- **Timeline scrubber** (slider) to jump to any date
+- **Speed control** (0.5×, 1×, 2×)
+- Frame label shows current date: e.g., `"June 15 – June 30, 2015"`
+
+#### 📈 Embedded Multi-Line Cumulative Chart (below the map)
+
+A small **multi-line chart** sits directly below the animated map within G3's panel:
+
+| Attribute | Detail |
+|-----------|--------|
+| **What it shows** | Cumulative rainfall (mm) over Jun–Oct for the selected state (clicked/hovered on the map) |
+| **Lines** | Current year (solid bold) + LPA baseline (dashed grey). In comparison mode: Year A (solid) + Year B (solid, different hue) + LPA (dashed). |
+| **X-axis** | Date (Jun 1 → Oct 31) |
+| **Y-axis** | Cumulative rainfall (mm) |
+| **Sync** | A vertical marker on this chart moves in sync with the animation frame. The map and the line chart tell the same story simultaneously. |
+
+> [!NOTE]
+> This satisfies §4.3's requirement for a "multi-line temporal progression chart" while keeping the animated choropleth as the primary visual.
+
+#### 🔄 Comparison Mode (Toggle Button)
+
+| Mode | Behavior |
 |------|----------|
-| `src/app/data/oniRaw.ts` | NOAA CPC ONI ASCII (1950–present, all 3-month seasons) |
-| `src/app/data/rainRaw.ts` | IMD homogeneous subdivision monthly rainfall (1901–2015) |
-| `src/app/data/india-map-raw.js` | SVG path data for India state boundaries |
+| **Single-year (default)** | One India map, one year selector dropdown |
+| **Comparison ON** | Map splits into **two side-by-side India maps** — each with its own year dropdown. Both animate **in sync** (same frame = same date window). A **difference tooltip** on hover shows: `State X: Year A = 320mm, Year B = 180mm, Δ = +140mm (+78%)` |
+
+> [!TIP]
+> Typical use: compare an **El Niño year** (e.g., 2015) vs. a **La Niña year** (e.g., 2010) to visually see monsoon delay and deficit in real-time.
 
 ---
 
-## The 7 Dashboard Panels
+### Graph 4 — Rainfall Anomaly Choropleth *(Proposal §4.4)*
 
-The dashboard uses a **12-column CSS grid** layout with 3 rows, optimized for landscape (widescreen) single-viewport display. All panels are wrapped in `<PanelCard>` with a title, info tooltip, and optional header actions.
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Static choropleth map of India** (seasonal summary) |
+| **Size** | 🟡 **Small-medium** (complements Graph 3 with a seasonal aggregate view) |
+| **Data** | State daily rainfall → JJAS total per state per year. `% deviation = (actual − LPA) / LPA × 100` |
+| **What to plot** | States colored by % rainfall anomaly, **diverging scale**: brown (deficit) ↔ white (normal) ↔ green (surplus) |
+| **Interactivity** | Year dropdown; hover tooltip: state name, actual mm, LPA mm, % deviation |
 
-### Panel G1 — SST Dataset Comparison
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `SstComparePanel.tsx` |
-| **Position** | Row 2, columns 1–3 (left) |
-| **Type** | Grid heatmap (`GridHeatmap`) of SST anomaly |
-| **Data** | `sstNino34.ts` (client-side modeled Niño-3.4 grids) with API fallback to `/api/sst/grid` |
-| **Interactivity** | Event dropdown (Nov 2015 / Nov 2020 / Nov 2023); hover tooltip shows lat, lon, SST, anomaly |
-| **Compare mode** | Shows two stacked grids: Year A vs Year B |
-| **Color scale** | Diverging RdBu, ±3°C domain |
-
-### Panel G2 — Oceanic Niño Index (ONI) Timeline
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `OniStripPanel.tsx` |
-| **Position** | Row 1, columns 1–9 (top strip) |
-| **Type** | Recharts `AreaChart` with diverging gradient fill + `Brush` selector |
-| **Data** | Real NOAA CPC ONI via `getOniSeries()` with API fallback to `/api/oni/timeseries` |
-| **Interactivity** | Brush handles set `brushRange` in `FilterContext`, which drives the Phase Distribution and Seasonal Intensity panels |
-| **Reference lines** | ±0.5°C El Niño/La Niña thresholds + zero baseline |
-
-> **Note:** The original plan described a slide-out detail drawer. In the implementation, the drawer contents were promoted to standalone right-column panels (Phase Distribution + Seasonal Intensity).
-
-### Panel G3 — Animated Monsoon Onset & Accumulation (HERO)
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `MonsoonHeroPanel.tsx` (via `CenterPanel.tsx` dropdown) |
-| **Position** | Row 2–3, columns 4–9 (center, 2-row span) |
-| **Type** | Animated India choropleth (`IndiaChoropleth` + `RainfallAnimatedMap`) |
-| **Data** | `monsoonDaily.ts` — per-state daily rainfall with cumulative tracking |
-| **Encoding** | Fill color = cumulative rainfall (sequential yellow→teal→blue); Dot-overlay pattern density = current-period rainfall intensity |
-| **Controls** | `PlaybackControls` — ▶ Play / ⏸ Pause, `Slider` scrubber, speed selector (0.5×/1×/2×/4×) |
-| **Sub-chart** | `SeasonCumulativeChart` — multi-line cumulative rainfall for the selected state with a `ReferenceLine` synced to the playback frame |
-| **Compare mode** | Side-by-side dual maps (Year A / Year B) with synced animation; cumulative chart overlays both years |
-| **Frame label** | Badge showing current date range (e.g., "Jun 15 – Jun 30") |
-
-### Panel G4 — Seasonal Rainfall Anomaly
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `RainfallAnomalyPanel.tsx` (via `CenterPanel.tsx` dropdown) |
-| **Position** | Shares center slot with G3 (dropdown toggle) |
-| **Type** | Static India choropleth |
-| **Data** | `getRainfallAnomalyDetail()` with API fallback to `/api/rainfall/anomaly` |
-| **Color scale** | Diverging brown (deficit) ↔ white (normal) ↔ green (surplus) |
-| **Tooltip** | State name, actual mm, LPA mm, % deviation |
-| **Compare mode** | Side-by-side dual choropleths (Year A / Year B) |
-
-### Panel G5 — ONI vs Rainfall Statistics
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `OniRainfallStatsPanel.tsx` |
-| **Position** | Row 3, columns 1–3 (bottom-left) |
-| **Type** | Tab toggle between **Scatter** and **Sensitivity** views |
-| **Scatter** | `OniRainfallScatter` — per-state per-year ONI vs rainfall anomaly %; OLS regression line; Pearson r + p-value; dots colored by ENSO phase |
-| **Heatmap** | `StateSensitivityHeatmap` — single-column ranked list of states by Pearson r (diverging color); clicking a state switches to Scatter view |
-| **Data** | `getStateOniCorrelation()` / `getStateOniScatter()` with API fallback to `/api/correlation/heatmap` and `/api/correlation/scatter` |
-
-### Phase Distribution Panel
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `PhaseDistributionPanel.tsx` |
-| **Position** | Right column (row 1–2, columns 10–12), top sub-cell |
-| **Type** | Recharts `PieChart` donut via `PhaseDonut` |
-| **Data** | `getPhaseDistribution(brushRange)` — counts of El Niño / La Niña / Neutral months |
-| **Behavior** | Reacts to G2 brush range |
-
-### Seasonal Intensity Panel
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `SeasonalIntensityPanel.tsx` |
-| **Position** | Right column (row 1–2, columns 10–12), bottom sub-cell |
-| **Type** | `OniSeasonalMatrix` — `GridHeatmap` of month × year ONI values |
-| **Data** | `getOniMonthYearMatrix(brushRange)` |
-| **Color scale** | Diverging, ±2.5 domain (La Niña ↔ neutral ↔ El Niño) |
-| **Behavior** | Reacts to G2 brush range |
-
-### Panel G6 — NDVI vs ONI (Vegetation Impact)
-
-| Attribute | Implementation |
-|-----------|---------------|
-| **Component** | `NdviOniPanel.tsx` |
-| **Position** | Row 3, columns 10–12 (bottom-right) |
-| **Type** | Recharts dual-axis `ComposedChart` |
-| **Data** | `getNdviOniSeries()` with API fallback to `/api/ndvi/regional` |
-| **Left axis** | NDVI (green `Line`, domain 0.2–0.8) |
-| **Right axis** | ONI (shaded `Area` with red→blue gradient, domain ±2.5) |
-| **Kharif highlight** | `ReferenceArea` shading over weeks 4–15 |
-| **Region selector** | `ViewSelect` dropdown (North / South / East & NE / West / Central) |
-| **Compare mode** | Overlays Year B NDVI as dashed line |
+> [!NOTE]
+> This is the **static seasonal summary** complement to Graph 3's animation. Graph 3 shows *how* the monsoon progressed; Graph 4 shows the *final result* for any year.
 
 ---
 
-## Layout (CSS Grid)
+### Graph 5 — ONI vs. Rainfall Correlation *(Proposal §4.5)*
 
-```
-┌────────────────────────────────────────────────────────────────────────────────┐
-│ DashboardHeader: [Logo] Year A [▼] Year B [▼] Phase [▼] State [▼] | Reset | ⚡Compare | 🌙 │
-├─────────────────────────────────────────────────┬──────────────────────────────┤
-│ G2: ONI Strip (cols 1-9, row 1)                  │ Phase Donut (cols 10-12)    │
-│ ▓▓▓▓░░░░▓▓▓▓▓░░░░▓▓▓▓░░░░░▓▓▓▓▓░░░░░▓▓▓▓▓▓▓   │                            │
-│ [=====brush=====]                                │ Seasonal Intensity          │
-├──────────┬──────────────────────────┬────────────┤ (month × year heatmap)     │
-│ G1: SST  │ G3/G4: Center Panel     │            ├──────────────────────────────┤
-│ Compare  │ (dropdown: Monsoon      │            │                              │
-│ Panel    │  onset / Rainfall       │            │                              │
-│          │  anomaly)               │            │                              │
-│          │                         │            │                              │
-│          │  [India Map / Anomaly]  │            │                              │
-│          │  [Cumulative Chart]     │            │                              │
-│          │  [▶ Playback Controls]  │            │                              │
-├──────────┼──────────────────────────┼────────────┴──────────────────────────────┤
-│ G5: ONI  │                         │ G6: NDVI vs ONI                           │
-│ vs Rain  │     (center spans       │ (dual-axis: NDVI + ONI)                   │
-│ Stats    │      both rows)         │                                           │
-│ [Scatter │                         │ ──── NDVI  ▓▓▓▓ ONI                      │
-│ /Heatmap]│                         │ [Region ▼]                                │
-└──────────┴─────────────────────────┴──────────────────────────────────────────┘
-```
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Scatter plot with regression line** + **Correlation heatmap** (tab toggle) |
+| **Size** | 🟡 **Small** (analytical/statistical panel, 25% width) |
+| **Data** | X = JJAS-average ONI, Y = JJAS rainfall anomaly (%) per state per year |
+| **What to plot** | Each dot = one year. Color dots by ENSO phase. OLS regression line. Display Pearson *r* and *p*-value. |
+| **Interactivity** | State/region dropdown; hover tooltip: year, ONI, anomaly % |
 
-### Grid Specification
+#### 🔀 Tab Toggle: `[Scatter]` · `[Heatmap]`
 
-```css
-grid-cols-12
-lg:grid-rows-[0.8fr_2.3fr_1.5fr]
-```
+Same panel space, two views:
 
-| Panel | Column Span | Row Span |
-|-------|------------|----------|
-| G2 ONI Strip | col 1–9 | row 1 |
-| Phase Distribution | col 10–12 | row 1–2 (top sub-cell) |
-| Seasonal Intensity | col 10–12 | row 1–2 (bottom sub-cell) |
-| G1 SST | col 1–3 | row 2 |
-| G3/G4 Center | col 4–9 | row 2–3 |
-| G5 Stats | col 1–3 | row 3 |
-| G6 NDVI | col 10–12 | row 3 |
+| Tab | Visualization |
+|-----|---------------|
+| **Scatter** (default) | Scatter plot for one selected state with regression line, Pearson *r*, *p*-value |
+| **Heatmap** | Grid of all states showing Pearson *r* as cell color (diverging red–white–blue). Lets the user see *which states* are most ENSO-sensitive at a glance. Clicking a cell switches to Scatter tab for that state. |
+
+> [!TIP]
+> The heatmap view satisfies §4.5's requirement for "correlation heatmaps displaying Pearson correlation coefficients" across regions. The scatter view provides the detailed per-state drill-down.
 
 ---
 
-## Compare Mode
+### Graph 6 — NDVI vs. ONI (Vegetation Impact) *(Proposal §4.6)*
 
-Toggling **⚡ Compare** in the header enables global Year A vs Year B comparison:
-
-| Panel | Compare Behavior |
-|-------|-----------------|
-| **G1 SST** | Two stacked grids (Year A top, Year B bottom) |
-| **G3 Monsoon** | Side-by-side dual India maps with synced animation |
-| **G4 Anomaly** | Side-by-side dual choropleths |
-| **G5 Stats** | Ringed dots highlight Year A / Year B in scatter |
-| **G6 NDVI** | Year B NDVI overlaid as dashed line |
-| **Header** | Year B selector becomes visible |
+| Attribute | Detail |
+|-----------|--------|
+| **Type** | **Dual-axis line chart** |
+| **Size** | 🟡 **Small-medium** (supporting impact panel) |
+| **Data** | MODIS NDVI regional averages (Kharif: Jun–Oct) + ONI from ERSST |
+| **What to plot** | Left axis = NDVI (green line), Right axis = ONI (red/blue shaded). Kharif window highlighted. |
+| **Interactivity** | Region dropdown (N/S/E/W/Central); event toggle (2009 drought, 2015 El Niño); hover tooltip |
 
 ---
 
-## Cross-Filter State (`FilterContext`)
+## Landscape Layout (16:9 Widescreen)
 
-```typescript
-interface FilterState {
-  year: number;              // Year A (default: 2015)
-  compareYear: number;       // Year B (default: 1988)
-  phase: Phase | "All";
-  state: string | "All";
-  subdivision: string | "All";
-  selectedRegionId: string | null;   // map click
-  hoveredRegionId: string | null;
-  brushRange: [number, number] | null;  // ONI series indices
-  playbackDay: number;                  // G3 animation frame (0..152)
-  isPlaying: boolean;
-  compareMode: boolean;                 // global Year A vs Year B mode
-}
+The dashboard is designed for **landscape orientation** — wider than tall, optimized for widescreen monitors. All 6 graphs + controls fit in a single viewport without scrolling.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 🔧 [Year ▼] [Region ▼] [ENSO Phase ▼]           ENSO × INDIAN MONSOON          [⚡ Compare: OFF] │
+├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│  G2: ONI Timeline (FULL WIDTH — compact strip, ~15% height)                                       │
+│  ▓▓▓▓░░░░░░▓▓▓▓▓▓▓▓░░░░░▓▓▓▓▓▓░░░░░░░▓▓▓▓▓▓▓▓▓▓▓░░░░░░░▓▓▓▓▓▓▓▓░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   │
+│  [================brush================]                                                          │
+├───────────────────┬────────────────────────────────────────────────────┬───────────────────────────┤
+│                   │                                                    │                           │
+│  G1: SST Heatmap  │  ⭐ G3: Animated Monsoon Onset Choropleth         │  G4: Rainfall Anomaly     │
+│  (Niño 3.4)       │  (HERO — 50% width, ~55% height)                 │  Choropleth               │
+│  ~25% width       │                                                    │  ~25% width               │
+│  ~30% height      │  ┌────────────┐      ┌────────────┐              │  ~30% height              │
+│                   │  │            │      │            │ ← compare    │                           │
+│  🟥🟧🟨🟩🟦      │  │   INDIA    │      │   INDIA    │              │  [India Map]              │
+│  🟥🟧🟨🟩🟦      │  │   2015     │      │   2010     │              │  Brown ↔ Green            │
+│  🟥🟧🟨🟩🟦      │  │            │      │            │              │  (deficit ↔ surplus)      │
+│                   │  └────────────┘      └────────────┘              │                           │
+│                   │  [▶] [⏸] [⏪] [1×]   ════●══════════             │                           │
+│                   │  Jun 15 – Jun 30, 2015    [Legend]               │                           │
+├───────────────────┼──────────────────────────┬─────────────────────────┴───────────────────────────┤
+│                   │                          │                                                     │
+│  G5: ONI vs       │  G6: NDVI vs ONI         │  G6 continued...                                   │
+│  Rainfall Scatter │  Dual-axis Line Chart    │  ──── NDVI  ▓▓▓▓ ONI                               │
+│  ~25% width       │  (WIDE — 50% width,      │  [Kharif window highlighted]                       │
+│  ~25% height      │   ~25% height)           │                                                     │
+│  · · ·  /         │                          │                                                     │
+│   · · /·          │                          │                                                     │
+│    ·/· ·          │                          │                                                     │
+│  r = -0.52        │                          │                                                     │
+│                   │                          │                                                     │
+└───────────────────┴──────────────────────────┴─────────────────────────────────────────────────────┘
+
+ ◄─────────────────────────── 100% viewport width (landscape) ──────────────────────────────────────►
 ```
 
-All panels consume this context via `useFilters()` and react to changes automatically.
+### Size Allocation Summary (Landscape)
+
+| Graph | Role | Width | Height | Grid Area |
+|-------|------|-------|--------|-----------|
+| **G2 — ONI Timeline** | Global anchor | **Full (100%)** | Compact strip (~15%) | Top strip |
+| **⭐ G3 — Animated Monsoon** | Hero viz | **50% (center)** | **Tall (~55%)** | Center — dominates the view |
+| G1 — SST Heatmap | Supporting | 25% (left) | ~30% | Left of hero (top half) |
+| G4 — Rainfall Anomaly | Supporting | 25% (right) | ~30% | Right of hero (top half) |
+| G5 — Correlation Scatter | Analytical | 25% (left) | ~25% | Bottom-left |
+| **G6 — NDVI vs ONI** | Impact | **75% (wide)** | ~25% | Bottom-right, stretches wide |
+
+> [!TIP]
+> The layout follows a **T-shape** hierarchy: ONI strip across the top → Hero monsoon map dominates the center → supporting charts flank left/right → analytical charts line the bottom. The eye naturally flows from global context (top) → core story (center) → evidence (bottom).
 
 ---
 
-## Frontend Data Flow
+## Comparison Mode Behavior
 
-```mermaid
-graph TD
-    subgraph Bundled Data
-        ONI_RAW[oniRaw.ts<br>NOAA CPC ONI]
-        RAIN_RAW[rainRaw.ts<br>IMD Subdivision Rainfall]
-        MAP_RAW[india-map-raw.js<br>SVG Paths]
-    end
+When the user clicks **⚡ Compare Mode**:
 
-    subgraph Client-Side Processing
-        REAL[realData.ts<br>Parse & Memoize]
-        GEN[generators.ts<br>Deterministic Models]
-        SST[sstNino34.ts<br>Modeled SST Grids]
-        DAILY[monsoonDaily.ts<br>Daily Rainfall Model]
-    end
-
-    subgraph API Layer
-        API[api.ts<br>Fetch Wrappers]
-        HOOK[useApiData.ts<br>API-with-Fallback Hook]
-    end
-
-    subgraph Backend API
-        FAST[FastAPI<br>:8000/api/*]
-        DB[(SQLite<br>climate.db)]
-        JSON[Precomputed<br>JSON Files]
-    end
-
-    ONI_RAW --> REAL
-    RAIN_RAW --> REAL
-    REAL --> GEN
-    GEN --> SST
-    GEN --> DAILY
-
-    API --> FAST
-    FAST --> DB
-    FAST --> JSON
-
-    GEN --> HOOK
-    API --> HOOK
-    HOOK --> Panels
-
-    MAP_RAW --> Panels
+```
+┌─────────────────────────────────────────────┐
+│  ⚡ Compare Mode: [ON] 🟢                   │
+│  Year A: [2015 ▼]    Year B: [2010 ▼]       │
+├─────────────────────────────────────────────┤
+│                                             │
+│  Affected charts:                           │
+│                                             │
+│  G3: Splits into two side-by-side maps      │
+│      (synced animation)                     │
+│                                             │
+│  G4: Splits into two mini choropleths       │
+│      (Year A vs Year B seasonal totals)     │
+│                                             │
+│  G3 hover: shows Δ rainfall between years   │
+│  G5: Both years highlighted as special dots │
+│  G6: Both years' NDVI lines overlaid        │
+│                                             │
+└─────────────────────────────────────────────┘
 ```
 
-**Key design:** The `useApiData` hook tries the backend API first. If it returns data, that data replaces the client-side version. If the API fails (404, network error), the client-side generators provide identical data shapes. This makes the frontend fully functional without the backend.
+> [!IMPORTANT]
+> In comparison mode, **all 6 graphs react** — maps split, lines overlay, scatter dots highlight. This makes the comparison holistic across ocean → rain → crops.
 
 ---
 
-## Component Tree
+## Shading Detail for Graph 3
+
+Here's exactly how the two visual layers stack on each state:
 
 ```
-App.tsx
-├── ThemeProvider (next-themes)
-├── FilterProvider (FilterContext)
-├── TooltipProvider (shadcn)
-├── DashboardHeader
-│   ├── YearSelect × 1-2
-│   ├── Phase Select
-│   ├── State Select
-│   ├── Reset Button
-│   └── ⚡ Compare Switch
-└── Grid Layout
-    ├── OniStripPanel (G2)
-    │   └── AreaChart + Brush
-    ├── SstComparePanel (G1)
-    │   └── GridHeatmap × 1-2
-    ├── CenterPanel (dropdown toggle)
-    │   ├── MonsoonHeroPanel (G3)
-    │   │   ├── RainfallAnimatedMap × 1-2
-    │   │   ├── SeasonCumulativeChart
-    │   │   └── PlaybackControls
-    │   └── RainfallAnomalyPanel (G4)
-    │       └── IndiaChoropleth × 1-2
-    ├── Right Column
-    │   ├── PhaseDistributionPanel
-    │   │   └── PhaseDonut
-    │   └── SeasonalIntensityPanel
-    │       └── OniSeasonalMatrix
-    ├── OniRainfallStatsPanel (G5)
-    │   ├── OniRainfallScatter
-    │   └── StateSensitivityHeatmap
-    └── NdviOniPanel (G6)
-        └── ComposedChart (dual-axis)
+  Normal state rendering:          With current rainfall shading:
+
+  ┌─────────────┐                  ┌─────────────┐
+  │             │                  │ / / / / / / │ ← diagonal hatching
+  │  Solid fill │                  │/ / / / / / /│   = active rainfall
+  │  = cumul.   │                  │ / / / / / / │   this period
+  │  rainfall   │                  │/ / / / / / /│
+  │             │                  │ / / / / / / │
+  └─────────────┘                  └─────────────┘
+  Fill: deep teal                  Fill: deep teal (cumulative)
+  (high cumul. rain)               Overlay: dense hatching (heavy rain NOW)
+
+  ┌─────────────┐                  ┌─────────────┐
+  │             │                  │ ·   ·   ·   │ ← sparse dots
+  │  Light fill │                  │   ·   ·   · │   = light drizzle
+  │  = low      │                  │ ·   ·   ·   │   this period
+  │  cumul.     │                  │   ·   ·   · │
+  │             │                  │             │
+  └─────────────┘                  └─────────────┘
+  Fill: pale yellow                Fill: pale yellow (low cumulative)
+  (early monsoon)                  Overlay: sparse dots (light current rain)
 ```
 
----
+### Legend for Graph 3
 
-## Unused / Legacy Components
-
-The following components exist from earlier iterations but are **not rendered** by the current `App.tsx`:
-
-| Directory | Files | Status |
-|-----------|-------|--------|
-| `components/modules/` | `OverviewModule`, `OniTimelineModule`, `SpatialCompareModule`, `MonsoonProgressModule`, `StatsModule`, `AgricultureModule` | Superseded by `graphs/` panels |
-| `components/single/` | `HeroMapPanel`, `TimelinePanel`, `OceanYearsPanel`, `RelationshipsPanel`, `VegetationPanel` | Superseded by `graphs/` panels |
-| `components/` | `GlobalFilterSidebar`, `GlobalFilterBar` | Superseded by `DashboardHeader` |
-
-These may be safely removed in a future cleanup pass.
+```
+┌─ Legend ──────────────────────────────────────┐
+│                                                │
+│  Cumulative Rainfall (fill color):             │
+│  ░░░ 0mm ──── 200mm ──── 500mm ──── 1000mm+  │
+│  pale       light       teal       deep blue   │
+│  yellow     green                              │
+│                                                │
+│  Current Rainfall (overlay pattern):           │
+│  [   ] No rain   [ · ] Light   [ /// ] Heavy  │
+│                                                │
+└────────────────────────────────────────────────┘
+```

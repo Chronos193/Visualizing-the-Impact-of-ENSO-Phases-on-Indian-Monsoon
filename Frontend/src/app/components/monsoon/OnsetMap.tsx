@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useFilters } from "../../context/FilterContext";
 import { fetchMonsoonOnset, type ApiOnsetData } from "../../data/api";
 import { useApiData } from "../../data/useApiData";
+import { STATE_NAME_BY_ID } from "../../data/constants";
 import { IndiaChoropleth } from "../maps/IndiaChoropleth";
 import { LoadingState, ErrorState } from "../ui/ErrorState";
 
@@ -25,15 +26,19 @@ export function OnsetMap({ year, height = 420 }: { year: number; height?: number
   if (loading) return <LoadingState />;
   if (error || !onset) return <ErrorState message={error ?? "No onset data."} onRetry={refetch} />;
 
+  // Reverse map to get short IDs
+  const stateIdByName = Object.fromEntries(Object.entries(STATE_NAME_BY_ID).map(([id, name]) => [name, id]));
+
   const colorById: Record<string, string> = {};
   onset.forEach((d) => {
+    const id = stateIdByName[d.regionId] || d.regionId;
     if (d.onsetDay <= playbackDay) {
       const age = playbackDay - d.onsetDay;
       const t = Math.min(1, age / 30);
       const g = Math.round(120 + t * 80);
-      colorById[d.regionId] = `rgb(${Math.round(40 + (1 - t) * 80)}, ${g}, ${Math.round(60 + (1 - t) * 30)})`;
+      colorById[id] = `rgb(${Math.round(40 + (1 - t) * 80)}, ${g}, ${Math.round(60 + (1 - t) * 30)})`;
     } else {
-      colorById[d.regionId] = "var(--muted)";
+      colorById[id] = "var(--muted)";
     }
   });
 
