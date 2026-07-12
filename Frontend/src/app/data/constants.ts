@@ -37,6 +37,13 @@ export const STATE_NAME_BY_ID: Record<string, string> = Object.fromEntries(
   STATES.map((s) => [s.id, s.name]),
 );
 
+export function getIdByStateName(name: string): string {
+  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, "and").trim();
+  const target = norm(name);
+  const found = STATES.find((s) => norm(s.name) === target);
+  return found ? found.id : name;
+}
+
 /**
  * IMD-style meteorological subdivisions mapped to their parent state id.
  * A representative subset large enough to feel real while staying maintainable.

@@ -2,7 +2,7 @@ import { legendStops } from "../lib/colorScale";
 import { cn } from "./ui/utils";
 
 interface ColorLegendProps {
-  kind: "diverging" | "rainfall" | "sst" | "correlation";
+  kind: "diverging" | "rainfall" | "sst" | "correlation" | "sst-anomaly";
   /** Labels at the two ends (and optional middle). */
   minLabel: string;
   maxLabel: string;

@@ -22,7 +22,7 @@ export default function App() {
               {/* Single viewport:
                     Row 1     → G2 ONI strip (full width)
                     Rows 2-3  → G1 SST / G5 stats (left) | G3 Monsoon hero (center, full height) | G4 anomaly / G6 NDVI (right) */}
-              <div className="grid min-h-0 flex-1 auto-rows-[minmax(260px,auto)] grid-cols-12 gap-2 overflow-auto p-2 lg:auto-rows-auto lg:grid-rows-[0.8fr_2.3fr_1.5fr] lg:overflow-hidden">
+              <div className="grid min-h-0 flex-1 auto-rows-[minmax(260px,auto)] grid-cols-12 gap-2 overflow-auto p-2 lg:auto-rows-auto lg:grid-rows-[0.8fr_2.07fr_1.75fr] lg:overflow-hidden">
                 <OniStripPanel className="col-span-12 lg:col-span-9" />
 
                 <SstComparePanel className="col-span-12 md:col-span-6 lg:col-span-3 lg:col-start-1 lg:row-start-2" />

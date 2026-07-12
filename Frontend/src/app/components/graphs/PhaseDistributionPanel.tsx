@@ -17,8 +17,8 @@ export function PhaseDistributionPanel({ className }: { className?: string }) {
   return (
     <PanelCard
       className={className}
-      title="Phase distribution"
-      info="Share of months in El Niño / La Niña / Neutral conditions within the brushed window."
+      title="ENSO Phase Distribution"
+      info="Donut chart showing the share of months classified as El Niño (ONI ≥ +0.5), La Niña (ONI ≤ −0.5), or Neutral within the G2 brush window."
       bodyClassName="flex flex-col overflow-hidden"
     >
       {loading ? (

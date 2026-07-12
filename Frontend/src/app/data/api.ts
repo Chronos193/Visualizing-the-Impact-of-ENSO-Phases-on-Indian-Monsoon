@@ -157,6 +157,18 @@ export function fetchRainfallAnimationFrame(
   );
 }
 
+export interface ApiAnimationWeek {
+  week: number;
+  currentMm: number;
+  cumMm: number;
+}
+
+export type ApiAnimation = Record<string, ApiAnimationWeek[]>;
+
+export function fetchRainfallAnimation(year: number): Promise<ApiAnimation | null> {
+  return fetchJson<ApiAnimation>(`/rainfall/animation?year=${year}`);
+}
+
 export interface ApiSeasonalHeatmap {
   year: number;
   rows: string[];

@@ -27,8 +27,8 @@ export function MonsoonHeroPanel({
   return (
     <PanelCard
       className={className}
-      title={titleSlot ?? "G3 · Monsoon onset & accumulation"}
-      info="Fill colour = cumulative rainfall (dry yellow → wet blue). Dot-overlay density = current-period ('raining now') rainfall. Play to watch the season advance; click a state to re-target the chart."
+      title={titleSlot ?? "G3 · Monsoon Rainfall Progression"}
+      info="Animated choropleth of cumulative monsoon rainfall by state (June–October). Fill colour = seasonal total; dot density = current-period intensity. The line chart below tracks cumulative rainfall vs. the long-term average. Click any state to filter. Use playback to advance by fortnight."
       actions={
         <Badge variant="outline" className="tabular-nums">
           {frameLabel(playbackDay)}

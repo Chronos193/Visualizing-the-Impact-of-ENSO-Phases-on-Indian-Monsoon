@@ -41,7 +41,7 @@ export function CumulativeLinePlot({ year, regionId }: { year: number; regionId:
   if (loading) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? "No cumulative data."} onRetry={refetch} />;
 
-  const current = data[state.playbackDay];
+  const current = data[Math.min(data.length - 1, Math.max(0, Math.floor(state.playbackDay / 7)))];
 
   return (
     <div className="h-full min-h-0">

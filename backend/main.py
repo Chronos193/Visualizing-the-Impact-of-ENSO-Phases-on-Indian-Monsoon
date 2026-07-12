@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import sst, oni, rainfall, correlation, ndvi
+try:
+    from .routers import sst, oni, rainfall, correlation, ndvi
+except ImportError:
+    from routers import sst, oni, rainfall, correlation, ndvi
 import datetime
 
 app = FastAPI(title="ENSO-Monsoon Analytics API")

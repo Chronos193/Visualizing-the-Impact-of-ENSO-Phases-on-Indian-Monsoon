@@ -25,6 +25,8 @@ interface GridHeatmapProps {
   gap?: number;
   rounded?: boolean;
   className?: string;
+  /** When true, rows expand to fill the parent height (no scroll). */
+  fillHeight?: boolean;
 }
 
 export function GridHeatmap({
@@ -41,6 +43,7 @@ export function GridHeatmap({
   gap = 2,
   rounded = false,
   className,
+  fillHeight = false,
 }: GridHeatmapProps) {
   const [tip, setTip] = useState<TooltipState | null>(null);
 
@@ -49,19 +52,19 @@ export function GridHeatmap({
   cells.forEach((c) => byKey.set(`${c.row}:${c.col}`, c));
 
   return (
-    <div className={cn("w-full", className)}>
-      <div className="flex">
+    <div className={cn("w-full", fillHeight && "h-full", className)}>
+      <div className={cn("flex", fillHeight && "h-full")}>
         {rowLabels ? (
           <div
-            className="flex shrink-0 flex-col pr-2 text-right"
+            className={cn("flex shrink-0 flex-col pr-2 text-right", fillHeight && "h-full")}
             style={{ gap }}
           >
             {colLabels ? <div style={{ height: 16 }} /> : null}
             {Array.from({ length: rows }).map((_, r) => (
               <div
                 key={r}
-                className="text-muted-foreground flex items-center justify-end text-[10px] leading-none"
-                style={{ height: cellHeight }}
+                className="text-muted-foreground flex min-h-0 flex-1 items-center justify-end text-[10px] leading-none"
+                style={fillHeight ? undefined : { height: cellHeight }}
                 title={rowLabels[r]}
               >
                 <span className="max-w-[120px] truncate">{rowLabels[r]}</span>
@@ -70,7 +73,7 @@ export function GridHeatmap({
           </div>
         ) : null}
 
-        <div className="min-w-0 flex-1">
+        <div className={cn("min-w-0 flex-1", fillHeight && "h-full")}>
           {colLabels ? (
             <div
               className="text-muted-foreground grid text-[10px]"
@@ -93,7 +96,8 @@ export function GridHeatmap({
             className="grid"
             style={{
               gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-              gridAutoRows: `${cellHeight}px`,
+              gridAutoRows: fillHeight ? `calc(${100 / rows}% - ${gap}px)` : `${cellHeight}px`,
+              height: fillHeight ? "100%" : undefined,
               gap,
             }}
             onMouseLeave={() => setTip(null)}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFilters } from "../../context/FilterContext";
 import { fetchCorrelationHeatmap, fetchCorrelationScatter } from "../../data/api";
+import { STATE_NAME_BY_ID } from "../../data/constants";
 import { ColorLegend } from "../ColorLegend";
 import { PanelCard } from "../single/PanelCard";
 import { ViewSelect } from "../single/ViewSelect";
@@ -10,12 +11,14 @@ import { StateSensitivityHeatmap } from "../stats/StateSensitivityHeatmap";
 export function OniRainfallStatsPanel({ className }: { className?: string }) {
   const { state, selectRegion } = useFilters();
   const [view, setView] = useState<"scatter" | "heatmap">("scatter");
-  const regionId = state.selectedRegionId ?? "mp";
+  const ALL_INDIA = "All India";
+  const regionId = state.selectedRegionId ?? null;
+  const resolvedName = regionId ? (STATE_NAME_BY_ID[regionId] ?? regionId) : ALL_INDIA;
 
   return (
     <PanelCard
       className={className}
-      title="G5 · ONI vs rainfall"
+      title="ONI vs rainfall"
       info="How strongly each state's monsoon rainfall responds to ENSO. Scatter shows one state's per-year points with an OLS fit; the heatmap ranks every state by Pearson r."
       actions={
         <ViewSelect
@@ -33,11 +36,11 @@ export function OniRainfallStatsPanel({ className }: { className?: string }) {
       {view === "scatter" ? (
         <>
           <div className="min-h-0 flex-1">
-            <OniRainfallScatter regionId={regionId} />
+            <OniRainfallScatter stateName={resolvedName} />
           </div>
-          <div className="text-muted-foreground shrink-0 text-[11px]">
+          {/* <div className="text-muted-foreground shrink-0 text-[11px]">
             Colour = ENSO phase. {state.compareMode ? "Ringed dots = Year A / Year B." : "Switch to Sensitivity to pick a state."}
-          </div>
+          </div> */}
         </>
       ) : (
         <>

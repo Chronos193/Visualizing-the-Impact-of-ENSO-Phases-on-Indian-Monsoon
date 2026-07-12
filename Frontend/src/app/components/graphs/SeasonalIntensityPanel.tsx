@@ -17,8 +17,8 @@ export function SeasonalIntensityPanel({ className }: { className?: string }) {
   return (
     <PanelCard
       className={className}
-      title="Seasonal intensity — month × year"
-      info="ONI value for every month of each year in the window. Brush the G2 strip to change the range."
+      title="ONI Seasonal Intensity (Month × Year)"
+      info="Heatmap of monthly ONI values arranged by calendar month (rows) and year (columns). Warm colours = El Niño, cool colours = La Niña. Brush the G2 timeline to narrow the year range."
       bodyClassName="flex flex-col gap-2 overflow-auto"
     >
       {loading ? (

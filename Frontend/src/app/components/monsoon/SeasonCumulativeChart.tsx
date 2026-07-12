@@ -38,8 +38,9 @@ interface SeasonCumulativeChartProps {
 
 export function SeasonCumulativeChart({ year, compareYear }: SeasonCumulativeChartProps) {
   const { state } = useFilters();
-  const regionId = state.selectedRegionId ?? "mp";
-  const name = STATE_NAME_BY_ID[regionId] ?? regionId;
+  const ALL_INDIA = "All India";
+  const regionId = state.selectedRegionId ?? null;
+  const name = regionId ? (STATE_NAME_BY_ID[regionId] ?? regionId) : ALL_INDIA;
 
   const { data: dataA, loading: loadA, error: errA } = useApiData<ApiRainfallCumulative, CumRow[]>({
     apiFn: () => fetchRainfallCumulative(name, year),
@@ -79,7 +80,7 @@ export function SeasonCumulativeChart({ year, compareYear }: SeasonCumulativeCha
             <XAxis key="x" dataKey="date" tick={{ fontSize: 9 }} minTickGap={40} stroke="var(--muted-foreground)" />
             <YAxis key="y" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" width={40} />
             <Tooltip key="tip" contentStyle={tooltipStyle} />
-            <ReferenceLine key="frame" x={merged[state.playbackDay]?.date} stroke="var(--ring)" strokeWidth={1.5} />
+            <ReferenceLine key="frame" x={merged[Math.min(merged.length - 1, Math.max(0, Math.floor(state.playbackDay / 7)))]?.date} stroke="var(--ring)" strokeWidth={1.5} />
             <Line type="monotone" dataKey="cumA" name={`${year}`} stroke="var(--chart-1)" strokeWidth={2} dot={false} isAnimationActive={false} />
             {compareYear != null && (
               <Line type="monotone" dataKey="cumB" name={`${compareYear}`} stroke="var(--chart-2)" strokeWidth={2} dot={false} isAnimationActive={false} />

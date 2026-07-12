@@ -38,7 +38,7 @@ type Action =
 
 const initialState: FilterState = {
   year: 2015, // a strong El Niño year — good default story
-  compareYear: 1988, // a strong La Niña year — sharp real contrast
+  compareYear: 2020, // a strong La Niña year — sharp real contrast
   phase: ALL,
   state: ALL,
   subdivision: ALL,

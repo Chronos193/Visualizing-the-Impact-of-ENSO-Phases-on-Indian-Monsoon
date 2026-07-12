@@ -11,11 +11,12 @@ function cumColor(v: number, max: number): string {
   const cappedMax = Math.min(max, 1500);
   const t = Math.max(0, Math.min(1, v / (cappedMax || 1)));
   const stops: [number, [number, number, number]][] = [
-    [0, [248, 250, 252]],   // slate-50 (dry/almost white)
-    [0.2, [186, 230, 253]], // sky-200 (light blue)
-    [0.5, [56, 189, 248]],  // sky-400 (blue)
-    [0.8, [2, 132, 199]],   // sky-600 (dark blue)
-    [1, [15, 23, 42]],      // slate-900 (navy)
+    [0,    [253, 224,  71]],  // amber-300   — dry
+    [0.15, [217, 249, 157]],  // lime-200    — trace
+    [0.35, [134, 239, 172]],  // green-300   — light
+    [0.55, [20,  184, 166]],  // teal-500    — moderate
+    [0.75, [6,   95,  70 ]],  // emerald-900 — heavy
+    [1,    [12,  44,  79 ]],  // deep ocean  — very heavy
   ];
   for (let i = 0; i < stops.length - 1; i++) {
     const [t0, c0] = stops[i];
@@ -98,11 +99,21 @@ export function RainfallAnimatedMap({
     }
   });
 
+  // Pre-fill every known state with the dry color so the map is fully
+  // shaded on day 0 (no frame data yet) instead of falling back to emptyColor.
   const colorById: Record<string, string> = {};
   const patternById: Record<string, PatternDensity> = {};
+
+  // Seed all states with "dry" color
+  Object.values(stateIdByName).forEach((id) => {
+    colorById[id] = cumColor(0, maxCum);
+    patternById[id] = "none";
+  });
+
+  // Override with actual frame data (but never show dots on day 0 — no rain has fallen yet)
   Object.entries(frame).forEach(([id, cell]) => {
     colorById[id] = cumColor(cell.cumMm, maxCum);
-    patternById[id] = currentDensity(cell.currentMm);
+    if (day > 0) patternById[id] = currentDensity(cell.currentMm);
   });
 
   return (

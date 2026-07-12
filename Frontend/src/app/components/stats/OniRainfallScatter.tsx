@@ -15,7 +15,7 @@ import { useFilters } from "../../context/FilterContext";
 import { fetchCorrelationScatter, type ApiCorrelationScatter } from "../../data/api";
 import { useApiData } from "../../data/useApiData";
 import { linearRegression, pValue } from "../../data/utils";
-import { STATE_NAME_BY_ID } from "../../data/constants";
+import { YEAR_MIN, YEAR_MAX } from "../../data/constants";
 import { phaseColor } from "../../lib/colorScale";
 import type { Phase } from "../../data/types";
 import { ChartBox } from "../single/ChartBox";
@@ -26,7 +26,20 @@ const tooltipStyle = {
   border: "1px solid var(--border)",
   borderRadius: 8,
   fontSize: 12,
+  padding: "6px 10px",
 };
+
+function ScatterTip({ active, payload }: { active?: boolean; payload?: { payload: ScatterPoint }[] }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div style={tooltipStyle}>
+      <div className="font-semibold mb-0.5">{d.year}</div>
+      <div className="text-muted-foreground">ONI : {d.oni.toFixed(2)}</div>
+      <div className="text-muted-foreground">Rain anom % : {d.anomaly.toFixed(2)}</div>
+    </div>
+  );
+}
 
 interface ScatterPoint {
   year: number;
@@ -35,11 +48,18 @@ interface ScatterPoint {
   oni: number;
   anomaly: number;
   phase: string;
+  z: number; // dot area — encodes year (larger = more recent)
 }
 
-export function OniRainfallScatter({ regionId }: { regionId: string }) {
+/** Map year linearly to a dot area in [minPx, maxPx]. */
+function yearToSize(year: number, min = 14, max = 68): number {
+  const t = (year - YEAR_MIN) / Math.max(1, YEAR_MAX - YEAR_MIN);
+  return Math.round(min + t * (max - min));
+}
+
+export function OniRainfallScatter({ stateName }: { stateName: string }) {
   const { state } = useFilters();
-  const name = STATE_NAME_BY_ID[regionId] ?? regionId;
+  const name = stateName;
 
   const { data: points, loading, error, refetch } = useApiData<
     ApiCorrelationScatter,
@@ -54,8 +74,9 @@ export function OniRainfallScatter({ regionId }: { regionId: string }) {
         oni: p.oni,
         anomaly: p.anomaly_pct,
         phase: p.phase,
+        z: yearToSize(p.year),
       })),
-    deps: [regionId],
+    deps: [stateName],
   });
 
   if (loading) return <LoadingState />;
@@ -85,8 +106,8 @@ export function OniRainfallScatter({ regionId }: { regionId: string }) {
             <CartesianGrid key="grid" strokeDasharray="3 3" stroke="var(--border)" />
             <XAxis key="x" type="number" dataKey="x" name="ONI" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
             <YAxis key="y" type="number" dataKey="y" name="Rain anom %" tick={{ fontSize: 9 }} width={38} stroke="var(--muted-foreground)" />
-            <ZAxis key="z" range={[40, 40]} />
-            <Tooltip key="tip" contentStyle={tooltipStyle} cursor={{ strokeDasharray: "3 3" }} formatter={(v: number, n: string) => [Math.round(v * 100) / 100, n]} />
+            <ZAxis key="z" dataKey="z" range={[14, 68]} />
+            <Tooltip key="tip" content={<ScatterTip />} cursor={{ strokeDasharray: "3 3" }} />
             <ReferenceLine key="vx" x={0} stroke="var(--muted-foreground)" />
             <ReferenceLine key="hy" y={0} stroke="var(--muted-foreground)" />
             <Scatter key="reg" data={line} line={{ stroke: "var(--chart-4)", strokeWidth: 2 }} shape={() => <g />} isAnimationActive={false} />

@@ -37,8 +37,8 @@ export function OniStripPanel({ className }: { className?: string }) {
   return (
     <PanelCard
       className={className}
-      title="G2 · Oceanic Niño Index"
-      info="The anchor chart. Diverging ONI area over the full record; drag the handles to brush a window, then open the detail drawer for phase mix, seasonal intensity, and the ONI derivation."
+      title="G2 · ONI Timeline — ENSO Phase History"
+      info="Diverging area chart of the Oceanic Niño Index (2000–2024). Drag the brush handles to select any time window — the Phase Distribution and Seasonal Intensity panels update live to reflect your selection."
       actions={
         <span className="text-muted-foreground hidden text-xs lg:inline">{rangeLabel}</span>
       }
