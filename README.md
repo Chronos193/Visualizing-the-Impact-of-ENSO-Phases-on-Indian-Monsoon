@@ -14,7 +14,19 @@ This project explores the relationships between the El Niño-Southern Oscillatio
 The raw and precomputed datasets required for this project are hosted on Hugging Face.
 
 1. **Download the Datasets**:
-   Download the datasets from [https://huggingface.co/datasets/Chronos19/IndianMonsoon_ENSO_Impact](https://huggingface.co/datasets/Chronos19/IndianMonsoon_ENSO_Impact/).
+   Download the datasets from [https://huggingface.co/datasets/Chronos19/IndianMonsoon_ENSO_Impact/tree/main/db](https://huggingface.co/datasets/Chronos19/IndianMonsoon_ENSO_Impact/).
+   
+   Create a huggingface token to download the datasets with higher rate limit.
+   First export the token
+   ```bash
+   export HF_TOKEN='your_token_here'
+   ```
+   Then run the download command to download the datasets.
+   ```bash
+   hf download Chronos19/IndianMonsoon_ENSO_Impact \
+    --repo-type dataset \
+    --local-dir data
+   ```
 
 2. **Place the Data**:
    Extract and place the downloaded folders/files into the root `data/` directory keeping the following structure:
@@ -69,3 +81,14 @@ npm run dev
 
 ### How they connect
 The frontend uses a Vite proxy (`vite.config.ts`) to forward all API calls matching `/api/*` directly to the backend at `http://127.0.0.1:8000`. You do not need to configure CORS or change any URLs!
+
+
+## Team Members
+
+- Aayush Gajeshwar
+- Shubham Kumar Patel
+- Sourabh Sankhala
+- Dev Prakash
+- Prakhar Gupta
+- Deepak Kumar
+- Vishvas Patel
